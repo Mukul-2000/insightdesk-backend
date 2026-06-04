@@ -1,3 +1,6 @@
+# LIVE SERVER API
+https://insightdesk-backend.onrender.com
+
 # InsightDesk Backend API 🚀
 
 A secure Node.js & Express API for Retrieval-Augmented Generation (RAG) workflows using Google Gemini and MongoDB Atlas Vector Search.
