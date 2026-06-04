@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { ChatController } from '../controllers/chat.controller.js';
+import { requireAuth } from '../middlewares/auth.middleware.js';
+// import { protect } from '../middleware/auth.middleware.js'; // Add if you have auth middleware ready
+
+const router = Router();
+
+// This matches: GET /api/chat/history/:userId
+router.get('/history', requireAuth, ChatController.getHistory); 
+
+export default router;
