@@ -23,13 +23,36 @@ export class PortfolioChatController {
 
             // 4. Safely extract matches or define fallback notice string
             const hasContext = relevantMatches && relevantMatches.length > 0;
-            const contextText = hasContext
-                ? relevantMatches.map((doc: any) => doc.textChunk).join('\n\n')
-                : "No matching document context found.";
 
-            const uniqueSources = hasContext
-                ? Array.from(new Set(relevantMatches.map((doc: any) => doc.fileName)))
-                : [];
+let contextText = hasContext
+    ? relevantMatches.map((doc: any) => doc.textChunk).join('\n\n')
+    : "";
+
+// 💡 BULLETPROOF BACKUP: If database is empty or down, inject your data directly!
+if (!contextText || contextText.trim() === "") {
+    contextText = `
+    Mukul Sindhu is a Senior Full Stack Developer and AI Integration Engineer with over 4 years of experience.
+    
+    TECHNICAL SKILLS & TECH STACK:
+    - Frontend: React.js, TypeScript, JavaScript (ES6+), Material UI, Bootstrap, HTML5, CSS3
+    - Backend: Node.js, Express.js, REST APIs, WebSocket protocols, TypeORM
+    - AI & Automation: OpenAI API integration, Prompt Engineering, Workflow Automation, Node Cron
+    - Databases: MongoDB, PostgreSQL, Oracle DB
+    - Cloud/DevOps: AWS (EC2, S3, CloudWatch), Jenkins, Webhooks, Interakt API, Stripe, Razorpay
+    
+    FEATURED PROJECTS:
+    1. DocFlow (Oct 25 - Feb 26): Enterprise role-based document routing and approval tracking system built with Node, React, and MongoDB.
+    2. Smart Meeting Hub (Jan 25 - Sep 25): Corporate space allocation panel with real-time room availability and Outlook Calendar sync.
+    3. Dhunguru (Jun 24 - Dec 24): Music Academy SaaS platform built with TypeScript, React, Node, and Interakt WhatsApp API integrations.
+    4. Enterprise Client Portal (Dec 23 - May 24): Isolated data sharing dashboard with Stripe billing modules and Socket.io live chat.
+    5. SynchFit (Dec 22 - May 23): Hybrid coaching orchestration system for physical and virtual trainee class scheduling telemetry.
+    6. WorkOrder Lifecycle Manager (Jun 22 - Nov 22): Automation pipeline executing task scheduling using Node Cron and update webhooks.
+    `;
+}
+
+const uniqueSources = hasContext
+    ? Array.from(new Set(relevantMatches.map((doc: any) => doc.fileName)))
+    : ["Portfolio Static Baseline Data"];
 
             // 5. Construct a heavily constrained system prompt guarding target content bounds
             const structuredPrompt = `
