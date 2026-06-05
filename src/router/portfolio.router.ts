@@ -7,6 +7,6 @@ import { PortfolioChatController } from '../controllers/portfolio.controller.js'
 const router = Router();
 
 // This matches: GET /api/chat/history/:userId
-router.get('/chat', PortfolioChatController.chatWithPortfolioKB); 
+router.post('/chat', PortfolioChatController.chatWithPortfolioKB); 
 
 export default router;
