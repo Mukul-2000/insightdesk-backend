@@ -4,7 +4,7 @@ import { TextChunker } from '../util/textChunker.js';
 import { GeminiService } from '../services/gemini.service.js';
 import { DocumentDao } from '../dao/document.dao.js';
 import { AppError } from '../errorhandler/appError.js';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { BUCKET_NAME, s3Client } from '../config/s3.js';
 
 export class DocumentController {
@@ -94,6 +94,61 @@ export class DocumentController {
                 data: savedDocuments
             });
 
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    static async getUploadedFiles(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const userId = (req as any).user.userId;
+
+            // Hand off database querying execution to the Document DAO ⚡
+            const files = await DocumentDao.getUploadedFiles(userId);
+
+            res.status(200).json({
+                success: true,
+                data: files
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * SYSTEM-WIDE CASCADING ASSET PURGE
+     */
+    static async deleteFile(req: express.Request, res: express.Response, next: express.NextFunction) {
+        try {
+            const { s3Key } = req.body;
+            const userId = (req as any).user.userId;
+
+            if (!s3Key) {
+                throw new AppError('An explicit s3Key body parameter is required to delete target assets.', 400);
+            }
+
+            // 1. DROP PHYSICAL OBJECT MANIFEST FROM S3
+            try {
+                await s3Client.send(new DeleteObjectCommand({
+                    Bucket: BUCKET_NAME,
+                    Key: s3Key
+                }));
+            } catch (awsError) {
+                console.warn("AWS S3 target was unreachable or already missing. Moving to data wipe sweep:", awsError);
+            }
+
+            // 2. HAND PURGING WORK OVER TO THE DAO LAYER ⚡
+            const deleteResult = await DocumentDao.deleteFileChunks(userId, s3Key);
+
+            if (deleteResult.deletedCount === 0) {
+                throw new AppError('No corresponding records found to purge from the system indexes.', 404);
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Successfully purged document asset from AWS cloud and dropped all vector index chunks.',
+                chunksPurged: deleteResult.deletedCount
+            });
         } catch (error) {
             next(error);
         }
