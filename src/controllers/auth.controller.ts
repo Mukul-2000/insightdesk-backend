@@ -250,7 +250,7 @@ export class AuthController {
 
       // Security guard: obfuscate check loops to prevent email enumeration attacks
       if (!user) {
-        res.status(200).json({ success: true, message: 'If the account exists, a reset link has been dispatched.' });
+        res.status(200).json({ success: true, message: 'Account does not exist.' });
         return;
       }
 
