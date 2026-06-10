@@ -1,14 +1,20 @@
 import nodemailer from 'nodemailer';
 
 // Initialize the SMTP carrier transporter configuration
+const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
+const isSecure = smtpPort === 465;
+
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: false, // true for 465, false for other ports like 587
+    port: smtpPort,
+    secure: isSecure, // ✨ TRUE for 465, FALSE for 587
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
     },
+    // Keep your logger settings on for now until we confirm the production fix
+    logger: true,
+    debug: true
 });
 
 export class EmailService {
