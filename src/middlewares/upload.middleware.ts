@@ -38,7 +38,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
 };
 
 // ⚡ 3. Configure storage and boundaries (using memoryStorage for S3 streaming)
-export const uploadMiddleware = multer({
+export const upload = multer({
     storage: multer.memoryStorage(),
     fileFilter: fileFilter,
     limits: {
