@@ -1,33 +1,31 @@
-import nodemailer from 'nodemailer';
-
-// Initialize the SMTP carrier transporter configuration
-const smtpPort = parseInt(process.env.SMTP_PORT || '465', 10);
-const isSecure = smtpPort === 465;
-
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: smtpPort,
-    secure: isSecure, // ✨ TRUE for 465, FALSE for 587
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
-    // Keep your logger settings on for now until we confirm the production fix
-    logger: true,
-    debug: true
-});
-
 export class EmailService {
     /**
-     * SENDS A BEAUTIFULLY STYLED PASSWORD RECOVERY EMAIL
+     * DISPATCHES PASSWORD RECOVERY LINKS VIA BREVO'S HTTP API GATEWAY
      */
     static async sendPasswordResetEmail(toEmail: string, resetUrl: string, userName: string): Promise<void> {
-        const mailOptions = {
-            from: `"InsightDesk Core" <${process.env.FROM_EMAIL}>`,
-            to: toEmail,
-            subject: '🔒 Reset Your InsightDesk Account Password',
-            html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px;">
+        const apiKey = process.env.BREVO_API_KEY;
+        const fromEmail = process.env.FROM_EMAIL;
+
+        if (!apiKey) {
+            console.error('[EmailService Error]: BREVO_API_KEY parameter is missing from environment variables.');
+            return;
+        }
+
+        // Compile Brevo v3 REST API payload structure
+        const payload = {
+            sender: {
+                name: "InsightDesk Core",
+                email: fromEmail
+            },
+            to: [
+                {
+                    email: toEmail,
+                    name: userName
+                }
+            ],
+            subject: "🔒 Reset Your InsightDesk Account Password",
+            htmlContent: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px 24px; background-color: #ffffff; border: 1px solid #e4e4e7; border-radius: 16px;">
                     <div style="margin-bottom: 24px;">
                         <span style="font-size: 18px; font-weight: 800; color: #09090b; letter-spacing: -0.025em;">InsightDesk</span>
                         <div style="font-size: 10px; color: #a1a1aa; font-family: monospace; text-transform: uppercase; margin-top: 2px;">Workspace Engine</div>
@@ -40,7 +38,7 @@ export class EmailService {
                     </p>
                     
                     <div style="margin-bottom: 24px;">
-                        <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 18px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.1);">
+                        <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; padding: 10px 18px; border-radius: 10px;">
                             Reset Password
                         </a>
                     </div>
@@ -53,10 +51,25 @@ export class EmailService {
                         &copy; ${new Date().getFullYear()} InsightDesk Core Node.
                     </div>
                 </div>
-            `,
+            `
         };
 
-        // Fire transaction out over cloud SMTP routers
-        await transporter.sendMail(mailOptions);
+        // Fire outbound HTTPS request over port 443 
+        const response = await fetch(String(process.env.BREVO_URL), {
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': apiKey,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`Brevo API transmission rejected transaction: ${JSON.stringify(errorData)}`);
+        }
+        
+        console.log(`[EmailService]: Recovery mail dispatched successfully to ${toEmail}`);
     }
 }
