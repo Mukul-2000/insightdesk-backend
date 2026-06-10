@@ -21,9 +21,27 @@ export class UserDao {
 
   static async updatePasswordHash(id: string, hashedNew: string): Promise<IUser | null> {
     return await User.findByIdAndUpdate(
-        id, 
-        { passwordHash: hashedNew }, 
-        { new: true }
+      id,
+      { passwordHash: hashedNew },
+      { new: true }
     );
-}
+  }
+
+  static async setResetToken(email: string, token: string, expiry: Date) {
+    return await User.findOneAndUpdate(
+      { email: email.toLowerCase().trim() },
+      { resetPasswordToken: token, resetPasswordExpires: expiry },
+      { new: true }
+    );
+  }
+
+  /**
+   * FIND A VALID USER BY UNEXPIRED RESET TOKEN
+   */
+  static async findByResetToken(token: string) {
+    return await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() } // Verifies token hasn't expired yet
+    });
+  }
 }

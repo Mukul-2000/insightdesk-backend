@@ -5,6 +5,8 @@ export interface IUser extends Document {
   email: string;
   passwordHash: string;
   createdAt: Date;
+  resetPasswordToken?: string;
+resetPasswordExpires?: Date;
 }
 
 const UserSchema: Schema = new Schema({
@@ -26,7 +28,9 @@ const UserSchema: Schema = new Schema({
   createdAt: { 
     type: Date, 
     default: Date.now 
-  }
+  },
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date }
 });
 
 export const User = mongoose.model<IUser>('User', UserSchema);
