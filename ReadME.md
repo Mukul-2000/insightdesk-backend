@@ -2,7 +2,8 @@
 
 > Production-grade Node.js/TypeScript REST + WebSocket server powering the InsightDesk AI productivity workspace.
 
-🌐 **Live API:** [Render](https://insightdesk-backend.onrender.com/health) &nbsp;|&nbsp; 📦 **Frontend Repo:** [InsightDesk Frontend](#)
+🌐 **Live API:** [Render](https://insightdesk-backend.onrender.com/health) &nbsp;|&nbsp; 
+📦 **Frontend Repo:** [InsightDesk Frontend](https://insightdesk-frontend-xi.vercel.app/)
 
 ---
 
