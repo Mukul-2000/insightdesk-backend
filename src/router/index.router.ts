@@ -5,6 +5,7 @@ import documentRouter from './document.router.js';
 import authRouter from './auth.router.js';
 import chatRouter from './chat.router.js';
 import portfolioRouter from './portfolio.router.js';
+import studioRouter from './studio.router.js';
 
 const appRouter = Router();
 
@@ -15,5 +16,6 @@ appRouter.use('/documents', documentRouter);
 appRouter.use('/auth', authRouter);
 appRouter.use('/chat', chatRouter);
 appRouter.use('/portfolio', portfolioRouter);
+appRouter.use('/studio', studioRouter);
 
 export default appRouter;
