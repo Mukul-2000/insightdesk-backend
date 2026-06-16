@@ -6,11 +6,33 @@ import { globalErrorHandler } from './middlewares/error.middleware.js';
 import { AppError } from './errorhandler/appError.js';
 import { connectDatabase } from './config/database.js';
 import morgan from 'morgan';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+      origin: '*', // Adjust this to your frontend URL in production (e.g., 'http://localhost:3000')
+      methods: ['GET', 'POST']
+  }
+});
+
+// 🔌 3. Bind the Socket.io instance to Express so your StudioController can fetch it
+app.set('socketio', io);
+
+// 🔌 4. Handle generic real-time connection logging
+io.on('connection', (socket) => {
+  console.log(`🔌 Client connected to studio workspace stream: ${socket.id}`);
+  
+  socket.on('disconnect', () => {
+      console.log(`🔌 Client disconnected from stream: ${socket.id}`);
+  });
+});
 
 app.use(cors());
 app.use(express.json());
@@ -35,7 +57,7 @@ app.use(globalErrorHandler);
 // 🚨 FIXED: Only bind server ports and connect databases if NOT running unit tests
 if (process.env.NODE_ENV !== 'test') {
   connectDatabase();
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`🚀 Production architecture server running on http://localhost:${PORT}`);
   });
 }
