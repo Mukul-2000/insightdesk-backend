@@ -8,6 +8,8 @@ import { connectDatabase } from './config/database.js';
 import morgan from 'morgan';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter'; // 🔌 Added for horizontal socket scaling
+import { redisClient } from './config/redis.js'; // 🔌 Added your central Redis client instance
 
 dotenv.config();
 
@@ -54,12 +56,35 @@ app.all('/*splat', (req: Request, res: Response, next) => {
 
 app.use(globalErrorHandler);
 
-// 🚨 FIXED: Only bind server ports and connect databases if NOT running unit tests
-if (process.env.NODE_ENV !== 'test') {
-  connectDatabase();
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 Production architecture server running on http://localhost:${PORT}`);
-  });
-}
+// 🚨 ASYNC INITIALIZATION ENGINE: Safely boots DB, connects Redis, maps adapters, and starts server listening
+const startServer = async () => {
+  try {
+    if (process.env.NODE_ENV !== 'test') {
+      // 1. Establish primary Redis connection (Pub Channel)
+      await redisClient.connect();
+
+      // 2. Duplicate client to create a dedicated channel (Sub Channel)
+      const subClient = redisClient.duplicate();
+      await subClient.connect();
+
+      // 3. Inject Redis adapter to broker live WebSocket communication channels
+      io.adapter(createAdapter(redisClient, subClient));
+      console.log('📡 WebSockets successfully linked over Redis scale-out mesh');
+
+      // 4. Fire up the primary MongoDB Atlas connection
+      await connectDatabase();
+
+      // 5. Open the HTTP port listener
+      httpServer.listen(PORT, () => {
+        console.log(`🚀 Production architecture server running.`);
+      });
+    }
+  } catch (error) {
+    console.error('Fatal server boot initialization collapse:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 export default app;
