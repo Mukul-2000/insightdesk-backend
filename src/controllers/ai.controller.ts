@@ -84,7 +84,7 @@ Instructions:
 
             // 7. Fire the content generator call via the modern SDK layout
             // (Assumed "ai" instance is imported globally inside your controller file)
-            const response = await (global as any).ai.models.generateContent({
+            const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: structuredPrompt,
             });
