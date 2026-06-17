@@ -4,6 +4,7 @@ import { ChatDao } from '../dao/chat.dao.js';
 import { GeminiService } from '../services/gemini.service.js';
 import { AppError } from '../errorhandler/appError.js';
 import { ai } from '../config/gemini.js';
+import { redisClient } from '../config/redis.js';
 
 export class AiController {
     static async getResponse(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -20,14 +21,24 @@ export class AiController {
     static async chatWithKnowledgeBase(req: express.Request, res: express.Response, next: express.NextFunction) {
         try {
             const { question } = req.body;
-            const userId = (req as any).user.userId; // Extracted safely from requireAuth token guard
+            const userId = (req as any).user.userId;
 
             if (!question) {
                 throw new AppError('A clear question string is required to consult the knowledge context base.', 400);
             }
 
-            // 1. Fetch recent chat history from MongoDB to keep the conversation conversational
-            const recentHistory = await ChatDao.getRecentHistory(userId, 6);
+            // ⚡ REDIS TRACK: Optimize your RAG memory retrieval step
+            const contextCacheKey = `user:chat:history:${userId}:6`;
+            let recentHistory;
+
+            const cachedContext = await redisClient.get(contextCacheKey);
+            if (cachedContext) {
+                recentHistory = JSON.parse(cachedContext);
+            } else {
+                // Fetch from Mongo database only if Redis didn't have it yet
+                recentHistory = await ChatDao.getRecentHistory(userId, 6);
+                await redisClient.setEx(contextCacheKey, 900, JSON.stringify(recentHistory));
+            }
 
             // 2. Transpile the incoming question to a vector array coordinate
             const queryVector = await GeminiService.generateEmbedding(question);
@@ -38,8 +49,6 @@ export class AiController {
             // Save user question to database immediately
             await ChatDao.saveMessage(userId, 'user', question);
 
-            // REMOVED THE HARD BACKEND FALLBACK BLOCK HERE ❌
-            // Instead, safely parse whatever matches came back, or default to an empty notice string:
             const hasContext = relevantMatches && relevantMatches.length > 0;
             const contextText = hasContext
                 ? relevantMatches.map((doc: any) => doc.textChunk).join('\n\n')
@@ -51,10 +60,10 @@ export class AiController {
 
             // 5. Format Chat History
             const historyTranscript = recentHistory
-                .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+                .map((msg: any) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
                 .join('\n');
 
-            // 6. Build a smarter conversational RAG prompt
+            // 6. Build conversational RAG prompt
             const structuredPrompt = `
 You are an intelligent, contextual SaaS support assistant. 
 
@@ -68,14 +77,15 @@ ${contextText}
 User: ${question}
 
 Instructions:
-- If the user is just greeting you (e.g., "hello", "hi", "hey", "good morning"), respond warmly and conversationally without complaining about missing documents.
-- If the user is asking a specific factual question and the context says "No matching document context found", politely inform them that you don't have access to that information yet because they haven't uploaded the relevant CV or document. Do not hallucinate data.
+- If the user is just greeting you, respond warmly and conversationally without complaining about missing documents.
+- If the user is asking a specific factual question and the context says "No matching document context found", politely inform them that you don't have access to that information yet. Do not hallucinate data.
 - If matching context IS provided, answer the question accurately using only that data.
 `;
 
             // 7. Fire the content generator call via the modern SDK layout
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash', // or your target text model identifier
+            // (Assumed "ai" instance is imported globally inside your controller file)
+            const response = await (global as any).ai.models.generateContent({
+                model: 'gemini-2.5-flash',
                 contents: structuredPrompt,
             });
 
@@ -84,7 +94,14 @@ Instructions:
             // 8. Save the AI's generated response to the chat log database
             await ChatDao.saveMessage(userId, 'model', finalReply);
 
-            // 9. Return the full response package back to the user client
+            // 🧹 CACHE INVALIDATION HOOK: Since messages were just committed, your cache state is stale.
+            // Erase both key variants concurrently so the very next lookup pulls fresh, synchronized histories.
+            await Promise.all([
+                redisClient.del(`user:chat:history:${userId}:6`),
+                redisClient.del(`user:chat:history:${userId}:20`)
+            ]);
+
+            // 9. Return response package back to the user client
             res.status(200).json({
                 success: true,
                 reply: finalReply,
